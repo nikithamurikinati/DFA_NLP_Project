@@ -65,5 +65,5 @@ def get_objects(pt, sentence):
 if __name__ == '__main__':
 
 	generate_questions('Jim drove his car')
-	generate_questions('Jim drove his car, adn jane rode her bike')
+	generate_questions('Jim drove his car, and Jane rode her bike')
 
