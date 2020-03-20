@@ -263,6 +263,7 @@ class Parser():
         s_words = sentence.lemmatized.split(" ")
         for i in range(2, len(q_words)):
             for j in range(len(s_words)):
+                # Possibily add in similarity checking here too
                 if j == 0:
                     prev1 = "START"
                     prev2 = "START"
@@ -274,8 +275,6 @@ class Parser():
                     prev2 = s_words[j-1]
                 count += question.count(prev1 + " " + prev2 + " " + s_words[j])
         return count
-
-
 
 
     def get_possible_answers(self, text, question):
