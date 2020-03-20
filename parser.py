@@ -4,7 +4,13 @@ from spacy import displacy
 from collections import Counter
 import en_core_web_sm
 import string
-import neuralcoref
+#import neuralcoref
+
+class Sentence():
+    def __init__(self, original, lemmatized):
+        self.original = original
+        self.lemmatized = lemmatized
+
 
 class Parser():
     def __init__(self):
@@ -191,13 +197,14 @@ class Parser():
         return " ".join(lemma_sent)
 
     def extract_sentences(self, text, keywords):
-        # Extracts sentences in text that contain the 75% of the keywords
+        # Extracts sentences in text that contain the 66% of the keywords
         sentences = []
         start = 0
         process_text = self.preprocess_text(text)
         words = process_text.split()
         for i in range(len(words)):
             if words[i][-1] in string.punctuation and (i == len(words)-1 or words[i+1][0].isupper()):
+                currSent = Sentence()
                 sentences.append(" ".join(words[start:i+1]))
                 start = i + 1
         result = []
@@ -215,8 +222,7 @@ class Parser():
         return self.extract_sentences(text, keywords)
 
     def pronoun_resolution(self, sentence):
-        nlp = spacy.load('en')
-        neuralcoref.add_to_pipe(nlp)
+        neuralcoref.add_to_pipe(self.nlp)
         doc1 = nlp(sentence)
         print(doc1._.coref_clusters)
 
@@ -224,7 +230,7 @@ class Parser():
 
 
 parser = Parser()
-#print(parser.tokenize("Bob went to Central Park on Wednesday."))
+print(parser.tokenize("Bob went to Central Park on Wednesday."))
 #print(parser.question_parser("Where did Bob go on Wednesday?"))
 text = """The Old Kingdom is most commonly regarded as the 
 period from the Third Dynasty through to the Sixth Dynasty (2686–2181 BC). 
@@ -233,6 +239,6 @@ of the era as literally 'written in stone' and largely architectural in that it
 is through the monuments and their inscriptions that scholars have been able to 
 construct a history."""
 
-#print(parser.get_possible_answers(text, "Which era do historians call 'written in stone'?"))
-print(parser.pronoun_resolution("Bob went to the park. He brought his dog."))
+print(parser.get_possible_answers(text, "Which era do historians call 'written in stone'?"))
+#print(parser.pronoun_resolution("Bob went to the park. He brought his dog."))
 
