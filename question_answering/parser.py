@@ -319,6 +319,7 @@ and wealth of his subjects."""
 # print(parser.get_possible_answers(text, "Which era do historians regard as 'written in stone'?"))
 # print(parser.get_possible_answers(text, "Who was not called the Pharaoh until the New Kingdom?"))
 ans = parser.get_possible_answers(text, "Who asked for the wealth of his people?")
+ans = ans[0] + ["During the Old Kingdom, the king of Egypt (not called the Pharaoh until the New Kingdom) became a living god who ruled absolutely and didn't demand the services and wealth of his subjects."]
 #print(parser.pronoun_resolution("Bob went to the park. He brought his dog."))
 
 #implementing tf-idf
@@ -396,13 +397,17 @@ def compareToOriginal(originalQ, sentences):
         res = 0
         for i in range(len(vectorMapper[sentence])):
             res += origVector[i] * vectorMapper[sentence][i]
-
+        res = res // (len(sentence.split(" ")) + len(originalQ.split(" ")))
         resultDict[sentence] = res
-    return max(resultDict, key=resultDict.get)
+
+    return min(resultDict, key=resultDict.get)
     
+print(compareToOriginal("Who asked for the wealth of his people?", ans))
 
 
-print(compareToOriginal("Who asked for the wealth of his people?", ans[0]))
+# def generateAnswer(question):
+#     questionType = question[0]
+
 
         
 
