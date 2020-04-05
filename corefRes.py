@@ -1,4 +1,3 @@
-import nltk
 import os
 import stanfordnlp
 import string
@@ -111,7 +110,6 @@ def getCorefs(text, docCore, allSentences):
     return newSentences
 
 def modifyText(text, docCore):
-    #docCore = nlpCore.annotate(text)
     allSentences = []
     extractSentences(docCore, allSentences)
     res = getCorefs(text, docCore, allSentences)
