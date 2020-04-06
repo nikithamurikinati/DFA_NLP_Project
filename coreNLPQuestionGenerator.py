@@ -3,11 +3,8 @@ import stanfordnlp
 import string
 os.environ["CORENLP_HOME"] = "./corenlp"
 from stanfordnlp.server import CoreNLPClient
-#stanfordnlp.download('en') #uncomment if running for first time!!!!
+stanfordnlp.download('en') #uncomment if running for first time!!!!
 import corefRes
-
-nlpCore = CoreNLPClient(annotators=['tokenize','coref'],
-    timeout = 100000, memory='16G')
 
 text0 = "Chris Manning is a nice person. Chris wrote a simple sentence. He also gives oranges to people."
 
@@ -33,44 +30,6 @@ text2 = "Barack Hussein Obama II (born August 4, 1961) is an American politician
         "constitutional law at the University of Chicago Law School from 1992 to 2004."
 
 text3 = "The Old Kingdom is the period in the third millennium (c. 2686-2181 BC) "+\
-        "also known as the 'Age of the Pyramids' or 'Age of the Pyramid Builders' " +\
-        "as it includes the great 4th Dynasty when King Sneferu perfected the art "+\
-        "of pyramid building and the pyramids of Giza were constructed under the "+\
-        "kings Khufu, Khafre, and Menkaure. Egypt attained its first continuous peak "+\
-        "of civilization – the first of three so-called 'Kingdom' periods (followed "+\
-        "by the Middle Kingdom and New Kingdom) which mark the high points of "+\
-        "civilization in the lower Nile Valley. The term itself was coined by "+\
-        "eighteenth-century historians and the distinction between the Old Kingdom "+\
-        "and the Early Dynastic Period is not one which would have been recognized "+\
-        "by Ancient Egyptians. Not only was the last king of the Early Dynastic "+\
-        "Period related to the first two kings of the Old Kingdom, but the 'capital', "+\
-        "the royal residence, remained at Ineb-Hedg, the Ancient Egyptian name for "+\
-        "Memphis. The basic justification for a separation between the two periods "+\
-        "is the revolutionary change in architecture accompanied by the effects on "+\
-        "Egyptian society and economy of large-scale building projects. The Old Kingdom "+\
-        "is most commonly regarded as the period from the Third Dynasty through to "+\
-        "the Sixth Dynasty (2686–2181 BC). The 4th-6th Dynasties of Egypt, are "+\
-        "scarce and historians regard the history of the era as literally 'written "+\
-        "in stone' and largely architectural in that it is through the monuments "+\
-        "and their inscriptions that scholars have been able to construct a history. "+\
-        "Egyptologists also include the Memphite Seventh and Eighth Dynasties in "+\
-        "the Old Kingdom as a continuation of the administration centralized at "+\
-        "Memphis. While the Old Kingdom was a period of internal security and "+\
-        "prosperity, it was followed by a period of disunity and relative cultural "+\
-        "decline referred to by Egyptologists as the First Intermediate Period. "+\
-        "During the Old Kingdom, the king of Egypt (not called the Pharaoh until "+\
-        "the New Kingdom) became a living god who ruled absolutely and could demand "+\
-        "the services and wealth of his subjects. Under King Djoser, the first king "+\
-        "of the Third Dynasty of the Old Kingdom, the royal capital of Egypt was "+\
-        "moved to Memphis, where Djoser established his court. A new era of "+\
-        "building was initiated at Saqqara under his reign. King Djoser's "+\
-        "architect, Imhotep is credited with the development of building with stone "+\
-        "and with the conception of the new architectural form—the Step Pyramid. "+\
-        "The Old Kingdom is perhaps best known for the large number of pyramids "+\
-        "constructed at this time as burial places for Egypt's kings. For this "+\
-        "reason, the Old Kingdom is frequently referred to as 'the Age of the Pyramids.'"
-
-text4 = "The Old Kingdom is the period in the third millennium (c. 2686-2181 BC) "+\
         "also known as the 'Age of the Pyramids' or 'Age of the Pyramid Builders' " +\
         "as it includes the great 4th Dynasty when King Sneferu perfected the art "+\
         "of pyramid building and the pyramids of Giza were constructed under the "+\
@@ -258,6 +217,9 @@ def readFile(path):
 
 def generateQuestions(text):
     #modify text
+    nlpCore = CoreNLPClient(annotators=['tokenize','coref'],
+    timeout = 100000, memory='16G')
+
     nlpCore.start()
     docCore = nlpCore.annotate(text)
     text = corefRes.modifyText(text, docCore)
@@ -285,8 +247,7 @@ def generateQuestions(text):
         questions.extend(sentenceQuestionsM1(sentence, dependencies, \
                                                     types, POSTags, NERTags))
         questions.extend(sentenceQuestionsM2(sentence))
-    return questions
+    nlpCore.stop()
+    return "\n".join(questions)
     
 finalText = readFile("Development_data/set5/a10.txt")
-writeFile("questions", "\n".join(generateQuestions(finalText)))
-nlpCore.stop()
