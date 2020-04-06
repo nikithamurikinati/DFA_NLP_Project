@@ -250,4 +250,4 @@ def generateQuestions(text):
     nlpCore.stop()
     return "\n".join(questions)
     
-finalText = readFile("Development_data/set5/a10.txt")
+#finalText = readFile("Development_data/set5/a10.txt")
