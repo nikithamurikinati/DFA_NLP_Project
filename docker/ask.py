@@ -1,11 +1,11 @@
-import coreNLPQuestionGenerator as cqg
-import template_question_generation as tqg
+#import coreNLPQuestionGenerator as cqg
+import template_question_generator as tqg
 import sys
 
 article = sys.argv[1]
 nquestions = int(sys.argv[2])
 
-line_split_article = cqg.readFile(article)
+#line_split_article = cqg.readFile(article)
 f_ = open(article)
 string_article = f_.read()
 f_.close()
@@ -14,7 +14,7 @@ s = ''
 
 print('Starting')
 
-s += '\n'.join(cqg.generateQuestions(line_split_article))
+#s += join(cqg.generateQuestions(line_split_article))
 
 print('finished phase 1')
 

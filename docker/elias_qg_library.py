@@ -82,7 +82,7 @@ def get_parse_results(sentence, relation_finder):
 ##################################################################################
 
 def where_questions(sentence):
-	questions = []
+    questions = []
     parse_results = get_parse_results(sentence, get_noun_descriptor)
     if parse_results == None: return None
     assert(len(parse_results['Subject']) != 0)
@@ -104,7 +104,7 @@ def where_questions(sentence):
 
     
 def who_did_what_questions(sentence):
-	questions = []
+    questions = []
     parse_results = get_parse_results(sentence, get_verb_subj_dobj)
     if parse_results == None: return None
     assert(len(parse_results['Subject']) != 0)
@@ -118,9 +118,17 @@ def who_did_what_questions(sentence):
 
 sentence_split = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s'
 def generate_questions(article):
-	questions = []
+    questions = []
     sentences = re.split(sentence_split, article)
     for sentence in sentences:
-        questions += who_did_what_questions(sentence)
-        questions += where_questions(sentence)
+        try:
+            new_questions = who_did_what_questions(sentence)
+            questions += new_questions
+        except:
+            continue
+        try:
+            new_questions = where_questions(sentence)
+            questions += new_questions
+        except:
+            continue
     return '\n'.join(questions)

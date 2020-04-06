@@ -3,7 +3,7 @@ import stanfordnlp
 import string
 os.environ["CORENLP_HOME"] = "./corenlp"
 from stanfordnlp.server import CoreNLPClient
-stanfordnlp.download('en') #uncomment if running for first time!!!!
+#stanfordnlp.download('en') #uncomment if running for first time!!!!
 import corefRes
 
 text0 = "Chris Manning is a nice person. Chris wrote a simple sentence. He also gives oranges to people."
