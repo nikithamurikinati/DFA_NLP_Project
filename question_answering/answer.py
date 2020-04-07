@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import nltk
-import spacy
-from spacy import displacy
+#import spacy
+#from spacy import displacy
 #from collections import Counter
 import en_core_web_sm
 import string
@@ -15,6 +15,7 @@ os.environ["CORENLP_HOME"] = "./corenlp"
 from stanfordnlp.server import CoreNLPClient
 import phrase_label
 import tf_idf
+import sys
 
 class Sentence():
     def __init__(self, original, lemmatized):
@@ -484,7 +485,7 @@ def readFile(path):
     with open(path, "rt") as f:
         return  f.read()
 
-def parsefile(contents):
+def parseFile(contents):
     lines = contents.splitlines()
     breakSpot = 0
     for i in range(len(lines)):
@@ -501,7 +502,7 @@ def getQuestions(path):
     results = []
     for question in contents.splitlines():
         results.append(question)
-    return questions
+    return results
 
 def getAnswers(text, questions):
     text = parseFile(readFile(text))
@@ -516,7 +517,7 @@ def getAnswers(text, questions):
                 
 
 
-text = readFile("./Development_data/set1/a1.txt")
+#text = readFile("./Development_data/set1/a1.txt")
 
 #print(parser.get_possible_answers(text, "Which era do historians regard as 'written in stone'?"))
 #print(parser.getBestAnswer(text, "Who was not called the Pharaoh until the New Kingdom?"))
@@ -551,7 +552,7 @@ print(parser.getBestAnswer(text, "To these ends , over a period of time , what a
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('text', help='Path to corpus text')
-    parser.add_arguement('questions', help='Path to questions file')
+    parser.add_argument('questions', help='Path to questions file')
     args = parser.parse_args()
     text = args.text
     questions = args.questions
