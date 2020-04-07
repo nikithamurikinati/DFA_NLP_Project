@@ -3,11 +3,11 @@ import argparse
 import nltk
 import spacy
 from spacy import displacy
-from collections import Counter
+#from collections import Counter
 import en_core_web_sm
 import string
 #import neuralcoref
-from nltk.corpus import wordnet
+#from nltk.corpus import wordnet
 import corefRes
 import os
 import stanfordnlp
@@ -552,5 +552,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('text', help='Path to corpus text')
     parser.add_arguement('questions', help='Path to questions file')
+    args = parser.parse_args()
+    text = args.text
+    questions = args.questions
     getAnswers(text, questions)
 
