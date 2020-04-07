@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import nltk
 import spacy
@@ -443,7 +444,8 @@ class Parser():
     def getAnswerBeginning(self, question, bestAnswer):
         words = question.split(" ")
         if words[0].lower() == "where":
-            return self.getWhereAnswer(question, bestAnswer)
+            #return self.getWhereAnswer(question, bestAnswer)
+            return bestAnswer
         elif words[0].lower() == "why":
             return self.getWhyAnswer(question, bestAnswer)
         elif words[0].lower() == "how":
@@ -505,8 +507,12 @@ def getAnswers(text, questions):
     text = parseFile(readFile(text))
     questions = getQuestions(questions)
     parse = Parser()
+    result = ""
     for question in questions:
-        print(parse.getBestAnswer(text, question))
+        result += parse.getBestAnswer(text, question)
+        result += '\n'
+    result.strip()
+    sys.stdout.write(result)
                 
 
 
