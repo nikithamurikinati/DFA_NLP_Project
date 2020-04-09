@@ -16,8 +16,8 @@ from nltk.stem.wordnet import WordNetLemmatizer
 #os.environ["STANFORD_MODELS"]= "/usr/local/stanford-models/stanford-postagger-full-2016-10-31/models:/usr/local/stanford-models/stanford-ner-2016-10-31/classifiers"
 
 dependancy_parser = StanfordDependencyParser(
-    path_to_jar = 'stanford_models/stanford-parser-full-2018-10-17/stanford-parser.jar',
-    path_to_models_jar = 'stanford_models/stanford-english-corenlp-2018-02-27-models.jar')
+    path_to_jar = 'stanford-parser-full-2018-10-17/stanford-parser.jar',
+    path_to_models_jar = 'stanford-english-corenlp-2018-02-27-models.jar')
 
 def search_for_dep_with_pos(tree, deps, collection, pos_list):
     for pos in pos_list:
