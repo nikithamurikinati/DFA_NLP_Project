@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+import sys
+import os
+
+sys.stdout = open(os.devnull, "w")
 
 import GenerateSomeQuestions as cqg
 import template_question_generator as tqg
-import sys
 import math
 
 article = sys.argv[1]
@@ -32,6 +35,8 @@ s += '\n'
 #s = s.split('\n')
 #s = s[:nquestions]
 #s = '\n'.join(s)
+
+sys.stdout = sys.__stdout__
 
 sys.stdout.write(s)
 
