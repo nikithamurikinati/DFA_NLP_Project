@@ -18,7 +18,7 @@ import en_core_web_sm
 import random
 import neuralcoref
 import time
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_web_md')
 neuralcoref.add_to_pipe(nlp)
 
 
@@ -285,6 +285,7 @@ def best_questions(questions, n):
     for question in questions:
         if question.split()[0] == 'Who':
             q.append(question)
+            break
 
     while len(q) < n:
         q_candidate = questions[random.randint(0, len(questions))]
