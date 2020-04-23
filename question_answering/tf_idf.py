@@ -24,7 +24,7 @@ def calculateTermFrequencies(s):
             d[new] += 1
         else:
             d[new] = 1
-    print(d)
+    # print(d)
     vectorDict = dict()
     for word in d:
         vectorDict[word] = float(d[word]) / float(total)
@@ -44,8 +44,10 @@ def calcInverseDocFrequency(t, sentences):
     numDocs = 0
     for sentence in sentences:
         words = calculateTermFrequencies(sentence)
+        # print(words)
         if word in words:
             numDocs += 1
+    print(numDocs, t.lower())
     if(numDocs > 0):
         return math.log(len(sentences) / numDocs)
     else:
@@ -67,13 +69,21 @@ def findCosineSimilarity(query, document, vocab, sentences):
     d = 0
     for term in vocab:
         tf_idf = calculateTermFreq(term, query) * calcInverseDocFrequency(term, sentences)
+        print(query, tf_idf)
         tf_idf2 = calculateTermFreq(term, document) * calcInverseDocFrequency(term, sentences)
+        print(document, tf_idf2)
         q += tf_idf ** 2
         d += tf_idf2 ** 2
     if(q * d == 0):
         return 5000
     return dotProduct / (q * d)
 
+def matchingScore(query, document, vocab, sentences):
+    res = 0
+    for term in vocab:
+        tf_idf = calculateTermFreq(term, document) * calcInverseDocFrequency(term, sentences)
+        res += tf_idf
+    return res
 
 def compareToOriginal(originalQ, sentences): 
     allSentences = sentences + [originalQ]
@@ -83,25 +93,26 @@ def compareToOriginal(originalQ, sentences):
     words = originalQ.split(" ")
     for word in words:
         vocabulary.add(word.lower())
-    print(vocabulary)
+    # print(vocabulary)
 
     #comparing query with each sentence
     resultDict = dict()
     for s in sentences:
-        resultDict[s] = findCosineSimilarity(originalQ, s, vocabulary, allSentences)
+        resultDict[s] = matchingScore(originalQ, s, vocabulary, allSentences)
+        # resultDict[s] = findCosineSimilarity(originalQ, s, vocabulary, allSentences)
     print(resultDict)
 
-    return min(resultDict, key=resultDict.get)
+    return max(resultDict, key=resultDict.get)
 
  
 
 # q = "What was always a central concern for ancient Egyptians"
-# sents = ["Cheese wasn't always a central concern for the ancient Egyptians.", "Divine pardon at judgement was always a central concern for the ancient Egyptians."]
+# sents = ["I was wanting to die.", "Cheese wasn't always a central concern for the ancient Egyptians.", "Divine pardon at judgement was always a central concern for the ancient Egyptians."]
 
-# q = "Why does Sirius appear bright"
-# sents = ["The brightest star in the night sky, Sirius is recorded in the earliest astronomical records.",
-#     "Sirius appears bright because of its intrinsic luminosity and its proximity to Earth.", 
-# "Sirius (, a romanization of Greek Σείριος, Seirios, lit) is a star system and the brightest star in the Earth's night sky."]
+# # q = "Why does Sirius appear bright"
+# # sents = ["The brightest star in the night sky, Sirius is recorded in the earliest astronomical records.",
+# #     "Sirius appears bright because of its intrinsic luminosity and its proximity to Earth.", 
+# # "Sirius (, a romanization of Greek Σείριος, Seirios, lit) is a star system and the brightest star in the Earth's night sky."]
 # print(compareToOriginal(q, sents))
 
 
