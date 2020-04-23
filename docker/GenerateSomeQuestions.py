@@ -211,10 +211,12 @@ def binaryQuestions(nlp, question):
     if final[0] in ['.', ',', '?', ';', '-']:
         final = final[1:]
         final = final.strip()
-    if final[:-1].strip()[-1] in [".", ";"]:
+    if final[:-1].strip()[-1] in [".", ";", "!"]:
         final = final[:-1].strip()[:-1].strip() + "?"
     dTemp = nlp(final)
     if "VB" in dTemp[1].tag_:
+        return []
+    if final[0] == "'":
         return []
     return [final]
 
@@ -338,7 +340,7 @@ def getAllQuestions(path, numQuestions):
                 if q.count(s)%2 == 1:
                     notGood = True
             if q.count(" ") > 11 or notGood or q.count(" ") < 6 \
-                or q[0] in string.punctuation:
+                or not q[0].isalnum():
                 continue
             why.add(q)
         #time questions
@@ -349,7 +351,7 @@ def getAllQuestions(path, numQuestions):
                 if q.count(s)%2 == 1:
                     notGood = True
             if q.count(" ") > 11 or notGood or q.count(" ") < 6 \
-                or q[0] in string.punctuation:
+                or not q[0].isalnum():
                 continue
             whichTime.add(q)
         #binary questions
@@ -359,7 +361,7 @@ def getAllQuestions(path, numQuestions):
             for s in symbols:
                 if q.count(s)%2 == 1:
                     notGood = True
-            if notGood or q.count(" ") < 6 or q[0] in string.punctuation:
+            if notGood or q.count(" ") < 6 or not q[0].isalnum():
                 continue
             binary.add(q)
     #curate final lists
@@ -377,7 +379,8 @@ def getAllQuestions(path, numQuestions):
 
 def testing():
     #run this function to test the program
-    for i in range(1, 5):
-        for j in range(1, 11):
-           print(getAllQuestions(f'data/set{i}/a{j}.txt', 6))
+    for i in range(3, 4):
+        for j in range(1, 2):
+           print(getAllQuestions(f'Development_data/set{i}/a{j}.txt', 30))
            print("---------------")
+testing()
