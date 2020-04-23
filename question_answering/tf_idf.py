@@ -1,15 +1,28 @@
 import math
 import nltk
 from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
 lemmatizer = WordNetLemmatizer()
 
-print(lemmatizer.lemmatize("was"))
+# print(lemmatizer.lemmatize("was"))
 #implementing tf-idf
 
 #returns vector space representation for a sentence of term frequencies
 # need to define global variable sentences 
 
 # nlp = spacy.load("en_core_web_sm")
+
+
+def comparison(word1, word2):  #if word2 synonymous to word1, output word1, else output word2
+    w1s = wordnet.synsets(word1)
+    w2s = wordnet.synsets(word2)
+    for syn1 in w1s:
+        for syn2 in w2s:
+            if(syn1.wup_similarity(syn2) != None and syn1.wup_similarity(syn2) > 0.9):
+                return word1 
+    return word2
+        
+
 
 def calculateTermFrequencies(s):
     words = s.split(" ")
@@ -33,7 +46,13 @@ def calculateTermFrequencies(s):
 
 def calculateTermFreq(t, sentence):
     word = t.lower()
-    if(word in calculateTermFrequencies(sentence)):
+    d = calculateTermFrequencies(sentence)
+    for item in d:
+        word = comparison(item, word)
+        if(word == item):
+            break
+    
+    if(word in d):
         return calculateTermFrequencies(sentence)[word]
     else:
         return 0
@@ -44,10 +63,14 @@ def calcInverseDocFrequency(t, sentences):
     numDocs = 0
     for sentence in sentences:
         words = calculateTermFrequencies(sentence)
+        for item in words:
+            word = comparison(item, word) 
+            if(word == item):
+                break   
         # print(words)
         if word in words:
             numDocs += 1
-    print(numDocs, t.lower())
+    # print(numDocs, t.lower())
     if(numDocs > 0):
         return math.log(len(sentences) / numDocs)
     else:
@@ -69,9 +92,9 @@ def findCosineSimilarity(query, document, vocab, sentences):
     d = 0
     for term in vocab:
         tf_idf = calculateTermFreq(term, query) * calcInverseDocFrequency(term, sentences)
-        print(query, tf_idf)
+        # print(query, tf_idf)
         tf_idf2 = calculateTermFreq(term, document) * calcInverseDocFrequency(term, sentences)
-        print(document, tf_idf2)
+        # print(document, tf_idf2)
         q += tf_idf ** 2
         d += tf_idf2 ** 2
     if(q * d == 0):
@@ -100,19 +123,35 @@ def compareToOriginal(originalQ, sentences):
     for s in sentences:
         resultDict[s] = matchingScore(originalQ, s, vocabulary, allSentences)
         # resultDict[s] = findCosineSimilarity(originalQ, s, vocabulary, allSentences)
-    print(resultDict)
+    # print(resultDict)
 
     return max(resultDict, key=resultDict.get)
 
  
+# q = "Divine pardon at judgement was always a central concern for ancient Egyptians, Yes"
+# sents = ["Divine pardon at judgement was always a central concern for the ancient Egyptians."]
+
+# print(compareToOriginal(q, sents))
+
+
+
 
 # q = "What was always a central concern for ancient Egyptians"
 # sents = ["I was wanting to die.", "Cheese wasn't always a central concern for the ancient Egyptians.", "Divine pardon at judgement was always a central concern for the ancient Egyptians."]
 
-# # q = "Why does Sirius appear bright"
-# # sents = ["The brightest star in the night sky, Sirius is recorded in the earliest astronomical records.",
-# #     "Sirius appears bright because of its intrinsic luminosity and its proximity to Earth.", 
-# # "Sirius (, a romanization of Greek Σείριος, Seirios, lit) is a star system and the brightest star in the Earth's night sky."]
+# q = "Why does Sirius appear bright"
+# sents = ["The brightest star in the night sky, Sirius is recorded in the earliest astronomical records.",
+#     "Sirius appears bright because of its intrinsic luminosity and its proximity to Earth.", 
+# "Sirius (, a romanization of Greek Σείριος, Seirios, lit) is a star system and the brightest star in the Earth's night sky."]
+# q = "When was the government in the hands of the various nomes"
+# sents = ["The history of ancient Egypt is divided into three kingdoms and two intermediate periods.",
+# "During the intermediate periods (the periods of time between kingdoms) government control was in the hands of the various nomes (provinces within Egypt) and various foreigners.",
+# "For most parts of its long history, ancient Egypt was unified under one government."]
+
+
+# q = "What was the first phase of the festival"
+# sents = ["The first phase of the festival was a public drama depicting the murder and dismemberment of Osiris.", "The annual festival involved the construction of Osiris Beds formed in shape of Osiris, filled with soil and sown with seed."]
+
 # print(compareToOriginal(q, sents))
 
 
@@ -120,9 +159,7 @@ def compareToOriginal(originalQ, sentences):
 # tests = dict()
 # tests["What was always a central concern for ancient Egyptians"] = ["Cheese wasn't always a central concern for the ancient Egyptians.", "Divine pardon at judgement was always a central concern for the ancient Egyptians."]
 # tests["What was the first phase of the festival"] = ["The first phase of the festival was a public drama depicting the murder and dismemberment of Osiris.", "The annual festival involved the construction of Osiris Beds formed in shape of Osiris, filled with soil and sown with seed."]
-# tests["When was the government in the hands of the various nomes"] = ["The history of ancient Egypt is divided into three kingdoms and two intermediate periods.",
-# "During the intermediate periods (the periods of time between kingdoms) government control was in the hands of the various nomes (provinces within Egypt) and various foreigners.",
-# "For most parts of its long history, ancient Egypt was unified under one government."]
+
 
 
 
