@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import nltk
 import spacy
@@ -108,6 +107,14 @@ class Parser():
             ",": 0.05
         }
         self.nlp = en_core_web_sm.load()
+    def comparison(self, word1, word2):  #if word2 synonymous to word1, output word1, else output word2
+        w1s = wordnet.synsets(word1)
+        w2s = wordnet.synsets(word2)
+        for syn1 in w1s:
+            for syn2 in w2s:
+                if(syn1.wup_similarity(syn2) != None and syn1.wup_similarity(syn2) > 0.9):
+                    return word1 
+        return word2
 
     def question_parser(self, question):
         tokens = nltk.word_tokenize(question)
@@ -485,13 +492,58 @@ class Parser():
         return self.formatWhatAnswer(ans, nlp)
 
     def yesNoAnswer(self, question, bestAnswer):
+        #removing question statements
+        question = question.lower()
+        if(question[-1] in string.punctuation):
+            question = question[:-1]
+        if(bestAnswer[-1] in string.punctuation):
+            bestAnswer = bestAnswer[:-1]
+        bestAnswer = bestAnswer.lower()
+        
+        if("is it true that " in question):
+            question = question.replace("is it true that ", "")
+        if("is it false that " in question):
+            question = question.replace("is it false that ", "")
+        if("is it correct that " in question):
+            question = question.replace("is it correct that ", "")
+        if("is it accurate that " in question):
+            question = question.replace("is it accurate that ", "")
+
+        print(question, bestAnswer)
+
+
         # Really basic negation checking right now
         q = "not" in question
         a = "not" in bestAnswer
+        # print(q, a)
         if (q and a) or (not q and not a):
+            
+            qwords = question.split(" ")
+            question = question[1:]
+            awords = bestAnswer.split(" ")
+            for item in awords:
+                for i, item2 in enumerate(qwords):
+                    word = self.comparison(item, item2)
+                    if(word == item):
+                        qwords[i] = item
+            # print(qwords)
+            # print(awords)
+            for item in qwords:
+                if(item not in awords):
+                    # print(item)
+                    return "No."
             return "Yes."
+                        
+
         else:
             return "No."
+    #checking whether a word in the question isn't in the answer
+
+
+
+
+
+
 
     def getWhyAnswer(self, question, bestAnswer):
         # gets the answer for a why question
@@ -671,6 +723,11 @@ def getAnswers(text, questions):
     sys.stdout.write(result)
                 
 
+# p = Parser()
+# p.yesNoAnswer("Is France in Germany", "France is in London")
+# print(p)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('text', help='Path to corpus text')
@@ -679,4 +736,4 @@ if __name__ == "__main__":
     text = args.text
     questions = args.questions
     getAnswers(text, questions)
-
+'''
