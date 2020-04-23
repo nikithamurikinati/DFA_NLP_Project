@@ -383,4 +383,3 @@ def testing():
         for j in range(1, 2):
            print(getAllQuestions(f'Development_data/set{i}/a{j}.txt', 30))
            print("---------------")
-testing()
