@@ -25,7 +25,11 @@ def getNounPhrases(sentence):
     for subtree in subtrees:
         phrase = " ".join([t.text for t in subtree])
         result.append(phrase)
-    '''
+    return list(result)
+
+def getNounChunks(sentence):
+    nlp = en_core_web_sm.load()
+    doc = nlp(sentence)
     result = {np.text
     for nc in doc.noun_chunks
     for np in [
@@ -33,9 +37,7 @@ def getNounPhrases(sentence):
         doc[
         nc.root.left_edge.i
         :nc.root.right_edge.i+1]]}  
-    '''
     return list(result)
-
 
 def getVerbPhrases(sentence):
     nlp = en_core_web_sm.load()
@@ -135,14 +137,30 @@ def splitWhichQuestion(question):
             result = result + " " + getSentence(child, "").strip()
     nlpCore.stop()
     return result.strip(), item, qverb
-
-def splitWhatQuestion(question):
-    nlpCore.start()
-    docCore = nlpCore.annotate(question)
-    parseTree = docCore.sentence[0].parseTree
-    beginning = getSentence(parseTree.child[0].child[0], "").strip()
-    nlpCore.stop()
-    return beginning
-
 '''
+def splitWhatQuestion(question):
+    words = question.split(" ")
+    beginning = ""
+    nlp = nlp = en_core_web_sm.load()
+    doc = nlp(question)
+    verb = ""
+    verbFlag = False
+    rest = ""
+    for i in range(len(words)):
+        if not verbFlag:
+            if doc[i].pos_ == "VERB" or doc[i].pos_ == "AUX":
+                verbFlag = True
+                verb += (doc[i].text + " ")
+            else:
+                beginning += (doc[i].text + " ")
+        else:
+            if doc[i].pos_ != "VERB" and doc[i].pos_ != "AUX":
+                rest = " ".join(words[i:])
+                break
+            verb += (doc[i].text + " ")
+    rest = rest.replace("?", "")
+    return beginning.strip()
+
+
+
 #getNounVerbPhrasePairs("The Old Kingdom is the period in the third millennium (c. 2686-2181 BC) also known as the 'Age of the Pyramids' or 'Age of the Pyramid Builders' as it includes the great 4th Dynasty when King Sneferu perfected the art of pyramid building and the pyramids of Giza were constructed under the kings Khufu, Khafre, and Menkaure.")
