@@ -262,6 +262,8 @@ def hcc(sentence):
 
 def best_questions(questions, n):
 
+    questions = list(set(questions))
+
     if len(questions) <= n:
         return questions
 
