@@ -1,22 +1,22 @@
+#!/usr/bin/env python3
 import argparse
 import nltk
 import spacy
 from spacy import displacy
 from collections import Counter
 import en_core_web_sm
+import en_core_web_md
 import string
 import os
 os.environ["NLTK_DATA"] = "nltk_data"
 from nltk.corpus import wordnet
 #import corefRes
 import phrase_label_spacy
-import tf_idf
+import tf_idf2
 import sys
 from spacy.pipeline import Sentencizer
 from spacy.lang.en import English
 import GenerateSomeQuestions as cqg
-from pattern.en import conjugate
-from pattern.en import PAST, PRESENT
 
 class Sentence():
     def __init__(self, original, lemmatized):
@@ -107,14 +107,21 @@ class Parser():
             ",": 0.05
         }
         self.nlp = en_core_web_sm.load()
+    
     def comparison(self, word1, word2):  #if word2 synonymous to word1, output word1, else output word2
-        w1s = wordnet.synsets(word1)
-        w2s = wordnet.synsets(word2)
-        for syn1 in w1s:
-            for syn2 in w2s:
-                if(syn1.wup_similarity(syn2) != None and syn1.wup_similarity(syn2) > 0.9):
-                    return word1 
-        return word2
+        try:
+            w1s = wordnet.synsets(word1)
+            w2s = wordnet.synsets(word2)
+            for syn1 in w1s:
+                for syn2 in w2s:
+                    if(syn1.wup_similarity(syn2) != None and syn1.wup_similarity(syn2) > 0.9):
+                        return word1 
+            return word2
+        except:
+            if word1 == word2:
+                return word1
+            else:
+                return word2
 
     def question_parser(self, question):
         tokens = nltk.word_tokenize(question)
@@ -142,9 +149,6 @@ class Parser():
         # Using SpaCy for named entity recognition
         ner = self.nlp(question)
 
-        #print([(X.text, X.label_) for X in ner.ents])
-        #print(tagged)
-        #print(topWords)
         return topWords
     
     def preprocess_text(self, text):
@@ -194,11 +198,14 @@ class Parser():
         result3 = []
         best = None
         bestRatio = 0
+        backup = None
         for sentence in process_text:
             if not sentence.original[0].isalpha():
                 continue
             if len(sentence.original.split(" ")) < 3:
                 continue
+            if backup == None:
+                backup == sentence.original
             count = 0
             seen = set()
             for word in sentence.lemmatized.split():
@@ -224,7 +231,9 @@ class Parser():
                                 else:
                                     break
                         except:
-                            continue
+                            if kword == word:
+                                seen.add(word)
+                                count += 1
             bigram_count = self.count_bigram(sentence, question)
             trigram_count = self.count_trigram(sentence, question)
             unique_count = len(seen)
@@ -243,13 +252,18 @@ class Parser():
                     if ratio > bestRatio:
                         bestRatio = ratio
                         best = sentence.original
-                elif unique_count >=2:
-                    result2.append(sentence.original)
                 elif unique_count >=1:
                     result3.append(sentence.original)
         # Comment out these two lines to revert to previous "best" measure
         result = list(set(result))
-        best = tf_idf.compareToOriginal(question, result)
+        try:
+            best = tf_idf2.compareToOriginal(question, result)
+        except:
+            try:
+                result3 = list(set(result3))
+                best = tf_idf2.compareToOriginal(question, result3)
+            except:
+                best = backup
         return result, best, len(result)
 
     def count_bigram(self, sentence, question):
@@ -292,101 +306,27 @@ class Parser():
         # Get all the sentences that possibly contain the answer
         keywords = self.question_parser(self.lemmatize(question))
         return self.extract_sentences_keyword(text, question)
-    
-    def formatWhereAnswer(self, q_words, ans, nlp):
-        # formats the grammar of the where question answers
-        if q_words[-1] == "?": q_words = q_words[:-1]
-        elif q_words[-1][-1] == "?": q_words[-1] = q_words[-1].replace("?", "")
-        question = " ".join(q_words)
-        doc = nlp(question)
-        if doc[1].pos_ == "AUX" or doc[1].pos_ == "VERB":
-            ind = 0
-            for i in range(1, len(q_words)):
-                if doc[i].pos_ == "VERB":
-                    ind = i
-                    break
-            if q_words[1] == "did":
-                ans = ans.replace("did ", "", 1)
-                try:
-                    conj = conjugate(q_words[ind], tense = PAST)
-                except:
-                    conj = conjugate(q_words[ind], tense = PAST)
-                ans = ans.replace(q_words[ind], conj)
-            elif q_words[1] == "does":
-                ans = ans.replace("does ", "", 1)
-                try:
-                    conj = conjugate(q_words[ind], tense = PRESENT, person = 3)
-                except:
-                    conj = conjugate(q_words[ind], tense = PRESENT, person = 3)
-                ans = ans.replace(q_words[ind], conj)
-            elif q_words[1] == "do":
-                ans = ans.replace(f'{q_words[1]} ', "", 1)
-            else:
-                ans_words = ans.split(" ")
-                chunks = phrase_label_spacy.getNounChunks(ans)
-                longest = ""
-                for chunk in chunks:
-                    if ans.find(chunk) == len(ans_words[0]) + 1 and len(chunk) > len(longest):
-                        longest = chunk
-                if longest != "":
-                    ans = ans.replace(f'{ans_words[0]} {longest}', f'{longest} {ans_words[0]}', 1)
-                ans_ann = nlp(ans)
-                for i in range(len(ans_ann)):
-                    if ans_ann[i].pos_ == "VERB" and ans_ann[i+1].pos_ == "AUX":
-                        ans = ans.replace(f'{ans_ann[i].text} {ans_ann[i+1].text}', f'{ans_ann[i+1].text} {ans_ann[i].text}', 1)
-                        break
-        return ans
 
     def getWhereAnswer(self, question, bestAnswer):
         # Gets answer of the where questions
         words = question.split(" ")
-        main,qverb = (" ".join(words[2:]), words[1])
-        main.replace("?", "")
-        preposition = "in"
         nlp = en_core_web_sm.load()
-        if main[-1] == "?":
-            main = main[:-1]
-        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
-        if len(phrases) == 0:
+        doc = nlp(bestAnswer)
+        places = []
+        for ent in doc.ents:
+            if ent.label_ in {"PERSON", "GPE", "LOC", "FAC"}:
+                places.append(ent.text)
+        if places == []:
             nouns = phrase_label_spacy.getNounPhrases(bestAnswer)
-            prep = nlp(main.split(" ")[-1])
-            if prep[0].pos_ == "ADP":
-                main = " ".join(main.split(" ")[:-1])
-                preposition = prep[0].text
-            ans =  f'{main} {qverb} {preposition} {nouns[0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
-        if len(phrases) == 1:
-            prep = nlp(main.split(" ")[-1])
-            if prep[0].pos_ == "ADP":
-                main = " ".join(main.split(" ")[:-1])
-                preposition = prep[0].text
-            ans =  f'{main} {qverb} {preposition} {phrases[0][0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
-        possible = []
-        for phrase in phrases:
-            flag = True
-            noun, verb = phrase
-            for w in noun.split(" "):
-                if w in question and not nlp.vocab[w].is_stop:
-                    flag = False
-            if flag:
-                possible.append(phrase)
-        if len(possible) == 1:
-            prep = nlp(main.split(" ")[-1])
-            if prep[0].pos_ == "ADP":
-                main = " ".join(main.split(" ")[:-1])
-                preposition = prep[0].text
-            ans =  f'{main} {qverb} {preposition} {possible[0][0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
-        elif len(possible) == 0:
-            possible = phrases
-        np = self.bestNounPhrase(possible, question)
-        prep = nlp(main.split(" ")[-1])
-        if prep[0].pos_ == "ADP":
-            main = " ".join(main.split(" ")[:-1])
-            preposition = prep[0].text
-        ans =  f'{main} {qverb} {preposition} {np}.'
-        return self.formatWhereAnswer(words, ans, nlp)
+            return nouns[0]
+        possible =[]
+        for place in places:
+            if place not in question:
+                possible.append(place)
+        if possible != []:
+            return possible[0]
+        else:
+            return places[0]
     
     def bestNounPhrase(self, possible, question):
         # Gets the noun phrases with the most keywords in their corresponding
@@ -406,16 +346,16 @@ class Parser():
             if ratio > bestScore:
                 bestScore = ratio
                 bestNoun, bestVerb = noun, verb
+        if bestNoun == None:
+            return possible[0][0]
         return bestNoun
 
     def getWhoAnswer(self, question, bestAnswer):
         #gets the answer for a who questions
         phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
-        words = question.split(" ")
-        nlp = en_core_web_sm.load()
+        nlp = en_core_web_md.load()
         if len(phrases) == 1:
-            ans = question.replace(words[0], phrases[0][0], 1)
-            return self.formatWhatAnswer(ans, nlp)
+            return phrases[0][0]
         possible = []
         for phrase in phrases:
             flag = True
@@ -426,70 +366,94 @@ class Parser():
             if flag:
                 possible.append(phrase)
         if len(possible) == 1:
-            ans = question.replace(words[0], possible[0][0], 1)
-            return self.formatWhatAnswer(ans, nlp)
+            return possible[0][0]
+        elif len(possible) == 0:
+            possible = phrases
+        doc = nlp(bestAnswer)
+        ents = []
+        people = []
+        for ent in doc.ents:
+            for phrase in possible:
+                if ent.text in phrase[0]:
+                    if ent.label_ == "PERSON":
+                        people.append(phrase)
+                    if ent.label_ not in {"DATE", "TIME"}:
+                        ents.append(phrase)
+        if len(people) != 0:
+            return self.bestNounPhrase(people, question)
+        if len(ents) == 0:
+            return self.bestNounPhrase(possible, question)
+        else:
+            return self.bestNounPhrase(ents, question)
+
+    def getOtherAnswer(self, question, bestAnswer):
+        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
+        nlp = en_core_web_sm.load()
+        if len(phrases) == 1:
+            return phrases[0][0]
+        possible = []
+        for phrase in phrases:
+            flag = True
+            noun, verb = phrase
+            for w in noun.split(" "):
+                if w in question and not nlp.vocab[w].is_stop:
+                    flag = False
+            if flag:
+                possible.append(phrase)
+        if len(possible) == 1:
+            return possible[0][0]
         elif len(possible) == 0:
             possible = phrases
         np = self.bestNounPhrase(possible, question)
-        ans = question.replace(words[0], np, 1)
-        return self.formatWhatAnswer(ans, nlp)
-
-    def formatWhatAnswer(self, ans, nlp):
-        last = ans.split(" ")[-1]
-        last_w = nlp(last)
-        for aux in {" did ", " had "}:
-            ans = ans.replace(aux, " was the one that ", 1)
-            if last_w.pos_ == "VERB":
-                try:
-                    conj = conjugate(last_w.text, tense = PAST)
-                except:
-                    conj = conjugate(last_w.text, tense = PAST)
-                ans = ans.replace(last, conj)
-        for aux in {" do ", " have "}:
-            ans = ans.replace(aux, " are the ones that ", 1)
-            if last_w.pos_ == "VERB":
-                try:
-                    conj = conjugate(last_w.text, tense = PRESENT)
-                except:
-                    conj = conjugate(last_w.text, tense = PRESENT)
-                ans = ans.replace(last, conj)
-        for aux in {" does ", " has "}:
-            ans = ans.replace(aux, " is the one that ", 1)
-            if last_w.pos_ == "VERB":
-                try:
-                    conj = conjugate(last_w.text, tense = PRESENT, person = 3)
-                except:
-                    conj = conjugate(last_w.text, tense = PRESENT, person = 3)
-                ans = ans.replace(last, conj)
-        ans = ans.replace("will", "will be that one that", 1)
-        return ans
+        return np
 
     def getWhatAnswer(self, question, bestAnswer):
         #gets the answer for a who questions
         phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
-        beginning = phrase_label_spacy.splitWhatQuestion(question)
         words = question.split(" ")
         nlp = en_core_web_sm.load()
+        if "what" == words[0].lower() or "which" == words[0].lower():
+            beginning, categ = phrase_label_spacy.splitWhatQuestion(question)
+        else:
+            try:
+                i = words.index("what")
+            except:
+                i = words.index("which")
+            doc = nlp(question)
+            if i != len(doc) - 1:
+                if doc[i+1].pos_ not in {"VERB", "AUX"}:
+                    categ = doc[i+1].text
+                else: categ = ""
+            else: categ = ""
+        if categ != "":
+            for word in categ.split(" "):
+                if word in {"year", "month", "day", "century", "time", "millenium", "decade", "hour", "minute", "second", "day",
+                                "years", "months", "days", "centuries", "milleniums", "period", "periods", "hours", "minutes", "days", "seconds"}:
+                    return self.getWhenAnswer(question, bestAnswer)
         if len(phrases) == 1:
-            ans =  question.replace(beginning, phrases[0][0], 1)
-            return self.formatWhatAnswer(ans, nlp)
+            return phrases[0][0]
         possible = []
         for phrase in phrases:
             flag = True
             noun, verb = phrase
             for w in noun.split(" "):
-                if w in question and not nlp.vocab[w].is_stop:
+                if w in question and not nlp.vocab[w].is_stop and categ.strip() not in w.strip():
                     flag = False
             if flag:
                 possible.append(phrase)
         if len(possible) == 1:
-            ans = question.replace(beginning, possible[0][0], 1)
-            return self.formatWhatAnswer(ans, nlp)
+            return possible[0][0]
         elif len(possible) == 0:
             possible = phrases
-        np = self.bestNounPhrase(possible, question)
-        ans = question.replace(beginning, np, 1)
-        return self.formatWhatAnswer(ans, nlp)
+        moreSure = []
+        if categ != "":
+            for noun, verb in possible:
+                if categ.strip() in noun:
+                    moreSure.append((noun, verb))
+        if len(moreSure) == 0:
+            return self.bestNounPhrase(possible, question)
+        else:
+            return self.bestNounPhrase(moreSure, question)
 
     def yesNoAnswer(self, question, bestAnswer):
         #removing question statements
@@ -509,13 +473,11 @@ class Parser():
         if("is it accurate that " in question):
             question = question.replace("is it accurate that ", "")
 
-        print(question, bestAnswer)
 
 
         # Really basic negation checking right now
         q = "not" in question
         a = "not" in bestAnswer
-        # print(q, a)
         if (q and a) or (not q and not a):
             
             qwords = question.split(" ")
@@ -526,11 +488,8 @@ class Parser():
                     word = self.comparison(item, item2)
                     if(word == item):
                         qwords[i] = item
-            # print(qwords)
-            # print(awords)
             for item in qwords:
                 if(item not in awords):
-                    # print(item)
                     return "No."
             return "Yes."
                         
@@ -538,12 +497,6 @@ class Parser():
         else:
             return "No."
     #checking whether a word in the question isn't in the answer
-
-
-
-
-
-
 
     def getWhyAnswer(self, question, bestAnswer):
         # gets the answer for a why question
@@ -566,46 +519,9 @@ class Parser():
             split = "as"
         else:
             return bestAnswer
-        q_words = question.split(" ")
-        if q_words[-1] == "?": q_words = q_words[:-1]
-        elif q_words[-1][-1] == "?": q_words[-1] = q_words[-1].replace("?", "")
-        nlp = en_core_web_sm.load()
-        doc = nlp(question)
-        ans = f'{" ".join(q_words[1:])} {split} {reason}'
-        aux = nlp(q_words[1])
-        if aux[0].pos_ == "AUX" or aux[0].pos_ == "VERB":
-            ind = 0
-            for i in range(1, len(q_words)):
-                if doc[i].pos_ == "VERB":
-                    ind = i
-                    break
-            if q_words[1] == "did":
-                ans = ans.replace("did ", "", 1)
-                try:
-                    conj = conjugate(q_words[ind], tense = PAST)
-                except:
-                    conj = conjugate(q_words[ind], tense = PAST)
-                ans = ans.replace(q_words[ind], conj)
-            elif q_words[1] == "does":
-                ans = ans.replace("does ", "", 1)
-                try:
-                    conj = conjugate(q_words[ind], tense = PRESENT, person = 3)
-                except:
-                    conj = conjugate(q_words[ind], tense = PRESENT, person = 3)
-                ans = ans.replace(q_words[ind], conj)
-            elif q_words[1] == "do":
-                ans = ans.replace(f'{q_words[1]} ', "", 1)
-            else:
-                ans_words = ans.split(" ")
-                chunks = phrase_label_spacy.getNounChunks(ans)
-                longest = ""
-                for chunk in chunks:
-                    if ans.find(chunk) == len(ans_words[0]) + 1 and len(chunk) > len(longest):
-                        longest = chunk
-                ans = ans.replace(f'{ans_words[0]} {longest}', f'{longest} {ans_words[0]}', 1)
-        return ans
-
-    def getDatePrep(self, date):
+        return split + " " + reason
+          
+  
         # gets the preposition for a where question
         days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
         months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "November", "Decemeber"}
@@ -627,73 +543,67 @@ class Parser():
     def getWhenAnswer(self, question, bestAnswer):
         #gets the answer for a when question
         words = question.split(" ")
-        main,qverb = (" ".join(words[2:]), words[1])
-        main.replace("?", "")
-        nlp = en_core_web_sm.load()
-        if main[-1] == "?":
-            main = main[:-1]
-        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
-        if len(phrases) == 0:
-            nouns = phrase_label_spacy.getNounPhrases(bestAnswer)
-            preposition = self.getDatePrep(nouns[0])
-            ans =  f'{main} {qverb} {preposition} {nouns[0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
-        if len(phrases) == 1:
-            preposition = self.getDatePrep(phrases[0][0])
-            ans =  f'{main} {qverb} {preposition} {phrases[0][0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
+        nlp = en_core_web_md.load()
+        doc = nlp(bestAnswer)
+        ans_words = bestAnswer.split(" ")
+        nouns = phrase_label_spacy.getNounPhrases(bestAnswer)
         possible = []
-        for phrase in phrases:
-            flag = True
-            noun, verb = phrase
-            for w in noun.split(" "):
-                #replace with stop word check instead
-                if w in question and not nlp.vocab[w].is_stop:
-                    flag = False
-            if flag:
-                possible.append(phrase)
-        if len(possible) == 1:
-            preposition = self.getDatePrep(possible[0][0])
-            ans =  f'{main} {qverb} {preposition} {possible[0][0]}.'
-            return self.formatWhereAnswer(words, ans, nlp)
-        elif len(possible) == 0:
-            possible = phrases
-        np = self.bestNounPhrase(phrases, question)
-        preposition = self.getDatePrep(np)
-        ans =  f'{main} {qverb} {preposition} {np}.'
-        return self.formatWhereAnswer(words, ans, nlp)
+        for word in doc:
+            if word.pos_ == "ADP":
+                ind = word.i
+                rest = ans_words[ans_words.index(word.text)+1:]
+                for noun in nouns:
+                    found = " ".join(rest).find(noun)
+                    if found != -1 and found < 8:
+                        possible.append(noun)
+        if len(possible) == 0:
+            return nouns[0]
+        moreSure = []
+        for phrase in possible:
+            if phrase not in question:
+                moreSure.append(phrase)
+        if len(moreSure) == 0:
+            return possible[0]
+        dates = []
+        for phrase in moreSure:
+            doc = nlp(phrase)
+            for ent in doc.ents:
+                if ent.label_ in {"DATE", "TIME"}:
+                    dates.append(phrase)
+        if len(dates) == 0:
+            return possible[0]
+        else:
+            return dates[0]
 
-    def getAnswerBeginning(self, question, bestAnswer):
+
+    def getAnswer(self, question, bestAnswer):
         # determines type of question
-        try:
-            words = question.split(" ")
-            if words[0].lower() == "where":
-                return self.getWhereAnswer(question, bestAnswer)
-            elif words[0].lower() == "why":
-                return self.getWhyAnswer(question, bestAnswer)
-            elif words[0].lower() == "how":
-                return bestAnswer
-            elif words[0].lower() == "who":
-                return self.getWhoAnswer(question, bestAnswer)            
-            elif words[0].lower() == "what":
-                return self.getWhatAnswer(question, bestAnswer)
-            elif words[0].lower() == "does":
-                return self.yesNoAnswer(question, bestAnswer)
-            elif words[0].lower() == "is":
-                return self.yesNoAnswer(question, bestAnswer)
-            elif words[0].lower() == "which":
-                return self.getWhatAnswer(question, bestAnswer)
-            elif words[0].lower() == "when":
-                return self.getWhenAnswer(question, bestAnswer)
-            else:
-                return bestAnswer
-        except:
-            return bestAnswer
+        words = question.split(" ")
+        if words[0].lower() == "where":
+            return self.getWhereAnswer(question, bestAnswer)
+        elif words[0].lower() == "why" or "why" in words:
+            return self.getWhyAnswer(question, bestAnswer)
+        elif words[0].lower() == "how" or "how" in words:
+            return self.getOtherAnswer(question, bestAnswer)
+        elif words[0].lower() == "who" or words[0].lower() == "whom":
+            return self.getWhoAnswer(question, bestAnswer)            
+        elif words[0].lower() == "what" or "what" in words:
+            return self.getWhatAnswer(question, bestAnswer)
+        elif words[0].lower() == "does":
+            return self.yesNoAnswer(question, bestAnswer)
+        elif words[0].lower() == "is":
+            return self.yesNoAnswer(question, bestAnswer)
+        elif words[0].lower() == "which" or "which" in words:
+            return self.getWhatAnswer(question, bestAnswer)
+        elif words[0].lower() == "when" or "when" in words:
+            return self.getWhenAnswer(question, bestAnswer)
+        else:
+            return self.getOtherAnswer(question, bestAnswer)
 
     def getBestAnswer(self, text, question):
         # Gets the best answer for a question
         possible, best, length =  self.extract_sentences_keyword(text, question)
-        answer =  self.getAnswerBeginning(question, best).strip().capitalize()
+        answer =  self.getAnswer(question, best).strip().capitalize()
         if answer[-1] == "?":
             return answer[:-1] + "."
         return answer
@@ -716,17 +626,12 @@ def getAnswers(text, questions):
     parse = Parser()
     result = ""
     for question in questions:
+        question = question.replace("?", "")
         ans =  parse.getBestAnswer(text, question).capitalize()
-        #print(ans)
         result += ans
         result += '\n'
     sys.stdout.write(result)
                 
-
-# p = Parser()
-# p.yesNoAnswer("Is France in Germany", "France is in London")
-# print(p)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -736,4 +641,3 @@ if __name__ == "__main__":
     text = args.text
     questions = args.questions
     getAnswers(text, questions)
-'''

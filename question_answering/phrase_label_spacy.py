@@ -10,11 +10,7 @@ def getNounPhrases(sentence):
 
     nlp = en_core_web_sm.load()
     doc = nlp(sentence)
-    '''
-    result = []
-    for np in doc.noun_chunks:
-        result.append(np.text)
-    '''
+
     nlp = en_core_web_sm.load()
     doc = nlp(sentence)
     subtrees = []
@@ -71,73 +67,7 @@ def getNounVerbPhrasePairs(sentence):
                 break
     return result
 
-'''
-def getNounVerbPhrasesFromTree(parseTree, result):
-    types = set()
-    for child in parseTree.child:
-        types.add(child.value)
-    if "NP" in types and "VP" in types:
-        toDo = []
-        noun = None
-        verb = None
-        for child in parseTree.child:
-            if child.value =="NP" and noun == None:
-                noun = getSentence(child, "").strip()
-            elif child.value == "VP" and verb == None:
-                verb = getSentence(child, "").strip()
-            else:
-                toDo.append(child)
-        result.append((noun, verb))
-        for child in toDo:
-            result = getNounVerbPhrasesFromTree(child, result)
-    else:
-        for child in parseTree.child:
-            result = getNounVerbPhrasesFromTree(child, result)
-    nlpCore.stop()
-    return result
 
-def getNounVerbPhrasePairs(sentence):
-    nlpCore.start()
-    docCore = nlpCore.annotate(sentence)
-    parseTree = docCore.sentence[0].parseTree
-    return getNounVerbPhrasesFromTree(parseTree, [])
-
-def splitQuestion(question):
-    nlpCore.start()
-    docCore = nlpCore.annotate(question)
-    parseTree = docCore.sentence[0].parseTree
-    skip = True
-    result = ""
-    qverb = None
-    #print(parseTree.child[0])
-    for child in parseTree.child[0].child[1].child:
-        if qverb == None and "VB" in child.value:
-            qverb = child.child[0].value
-        if child.value == "NP":
-            skip = False
-        if not skip:
-            result = result + " " + getSentence(child, "").strip()
-    nlpCore.stop()
-    return result.strip(), qverb
-
-def splitWhichQuestion(question):
-    nlpCore.start()
-    docCore = nlpCore.annotate(question)
-    parseTree = docCore.sentence[0].parseTree
-    item = getSentence(parseTree.child[0].child[1], "")
-    skip = True
-    result = ""
-    qverb = None
-    for child in parseTree.child[1].child:
-        if qverb == None and "VB" in child.value:
-            qverb = child.child[0].value
-        if child.value == "NP":
-            skip = False
-        if not skip:
-            result = result + " " + getSentence(child, "").strip()
-    nlpCore.stop()
-    return result.strip(), item, qverb
-'''
 def splitWhatQuestion(question):
     words = question.split(" ")
     beginning = ""
@@ -159,7 +89,8 @@ def splitWhatQuestion(question):
                 break
             verb += (doc[i].text + " ")
     rest = rest.replace("?", "")
-    return beginning.strip()
+    categ = beginning.split(" ")[1:]
+    return beginning.strip(), " ".join(categ)
 
 
 
