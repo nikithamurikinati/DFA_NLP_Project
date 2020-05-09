@@ -1,0 +1,643 @@
+#!/usr/bin/env python3
+import argparse
+import nltk
+import spacy
+from spacy import displacy
+from collections import Counter
+import en_core_web_sm
+import en_core_web_md
+import string
+import os
+os.environ["NLTK_DATA"] = "nltk_data"
+from nltk.corpus import wordnet
+#import corefRes
+import phrase_label_spacy
+import tf_idf2
+import sys
+from spacy.pipeline import Sentencizer
+from spacy.lang.en import English
+import GenerateSomeQuestions as cqg
+
+class Sentence():
+    def __init__(self, original, lemmatized):
+        self.original = original
+        self.lemmatized = lemmatized
+
+
+class Parser():
+    def __init__(self):
+        self.weights = {
+            "CC": 0.05, #not important
+            "CD": 0.1, 
+            "DT": 0.05, #not important
+            "EX": 0.1,
+            "FW": 0.1,
+            "IN": 0.05, #not important
+            "JJ": 0.3,
+            "JJR": 0.3,
+            "JJS": 0.3,
+            "LS": 0.05, #not important
+            "MD": 0.1,
+            "NN": 0.6,
+            "NNS": 0.6,
+            "NNP": 0.75,
+            "NNPS": 0.75,
+            "PDT": 0.1,
+            "POS": 0.15,
+            "PRP": 0.2,
+            "PRP$": 0.2,
+            "RB": 0.3,
+            "RBR": 0.3,
+            "RBS": 0.3,
+            "RP": 0.1,
+            "TO": 0.05, #not important
+            "UH": 0.05, #not important
+            "VB": 0.6,
+            "VBD": 0.4,
+            "VBG": 0.4,
+            "VBN": 0.4,
+            "VBP": 0.4,
+            "VBZ": 0.4,
+            "WDT": 0.4,
+            "WP": 0.4,
+            "WP$": 0.4,
+            "WRB": 0.4,
+            ".": 0.05,
+            "''": 0.05
+        }
+
+        self.ques_weights = {
+            "CC": 0.05, #not important
+            "CD": 0.1, 
+            "DT": 0.05, #not important
+            "EX": 0.1,
+            "FW": 0.1,
+            "IN": 0.05, #not important
+            "JJ": 0.3,
+            "JJR": 0.3,
+            "JJS": 0.3,
+            "LS": 0.05, #not important
+            "MD": 0.1,
+            "NN": 0.6,
+            "NNS": 0.6,
+            "NNP": 0.75,
+            "NNPS": 0.75,
+            "PDT": 0.1,
+            "POS": 0.15,
+            "PRP": 0.2,
+            "PRP$": 0.2,
+            "RB": 0.3,
+            "RBR": 0.3,
+            "RBS": 0.3,
+            "RP": 0.1,
+            "TO": 0.05, #not important
+            "UH": 0.05, #not important
+            "VB": 0.6,
+            "VBD": 0.5,
+            "VBG": 0.5,
+            "VBN": 0.5,
+            "VBP": 0.5,
+            "VBZ": 0.5,
+            "WDT": 0.4,
+            "WP": 0.4,
+            "WP$": 0.4,
+            "WRB": 0.4,
+            ".": 0.05,
+            "''": 0.05,
+            ",": 0.05
+        }
+        self.nlp = en_core_web_sm.load()
+    
+    def comparison(self, word1, word2):  #if word2 synonymous to word1, output word1, else output word2
+        try:
+            w1s = wordnet.synsets(word1)
+            w2s = wordnet.synsets(word2)
+            for syn1 in w1s:
+                for syn2 in w2s:
+                    if(syn1.wup_similarity(syn2) != None and syn1.wup_similarity(syn2) > 0.9):
+                        return word1 
+            return word2
+        except:
+            if word1 == word2:
+                return word1
+            else:
+                return word2
+
+    def question_parser(self, question):
+        tokens = nltk.word_tokenize(question)
+        tagged = nltk.pos_tag(tokens)
+        topTen = len(tokens)//1.5
+        mappedVals = []
+        # Extracts more important words from text based on manual weight
+        # dictionary
+        for tag in tagged:
+            mappedVals.append((tag[0], self.ques_weights[tag[1]]))
+        mostImp = []
+        while len(mostImp) < topTen:
+            bestWord = None
+            bestScore = 0
+            for word in mappedVals:
+                if word[1] > bestScore:
+                    bestWord = word
+                    bestScore = word[1]
+            mostImp.append(bestWord)
+            mappedVals.remove(bestWord)
+        topWords = []
+        for word in mostImp:
+            topWords.append(word[0])
+        
+        # Using SpaCy for named entity recognition
+        ner = self.nlp(question)
+
+        return topWords
+    
+    def preprocess_text(self, text):
+        # Replaces text with lemmatized form when found
+        sentences = []
+        start = 0
+        nlp = English()
+        sentencizer = nlp.create_pipe("sentencizer")
+        nlp.add_pipe(sentencizer)
+        doc = nlp(text)    
+        sentences_lemm = []
+        for sentence in doc.sents:
+            sentence = str(sentence)
+            sentences_lemm.append(Sentence(sentence, self.lemmatize(sentence)))
+        return sentences_lemm
+
+    def lemmatize(self, sentence):
+        # Lemmatizes the words in a sentence
+        lemmas = [(x.orth_,x.pos_, x.lemma_) for x in [y 
+                                      for y
+                                      in self.nlp(sentence) 
+                                      if not y.is_stop and y.pos_ != 'PUNCT']]
+        lemma_sent = []
+        lemma_i = 0
+        for word in sentence.split():
+            if len(word) == 0: continue
+            if word[-1] in string.punctuation:
+                word = word[:-1]
+            if len(word) == 0: continue
+            if word[0] in string.punctuation:
+                word = word[1:]
+            if len(word) == 0: continue
+            if lemmas != [] and (lemma_i >= len(lemmas) or word != lemmas[lemma_i][0]):
+                lemma_sent.append(word)
+            elif len(lemmas) != 0:
+                lemma_sent.append(lemmas[lemma_i][2])
+                lemma_i += 1
+        return " ".join(lemma_sent)
+
+    def extract_sentences_keyword(self, text, question):
+        # Extracts sentences that most likely contain the answer
+        question = self.lemmatize(question)
+        keywords = self.question_parser(question)
+        process_text = self.preprocess_text(text)
+        result = []
+        result2 = []
+        result3 = []
+        best = None
+        bestRatio = 0
+        backup = None
+        for sentence in process_text:
+            if not sentence.original[0].isalpha():
+                continue
+            if len(sentence.original.split(" ")) < 3:
+                continue
+            if backup == None:
+                backup == sentence.original
+            count = 0
+            seen = set()
+            for word in sentence.lemmatized.split():
+                if word in keywords:
+                    count += 1
+                    if word not in seen:
+                        seen.add(word)
+                else:
+                    # similarity checking
+                    for kword in keywords:
+                        try:
+                            w1s = wordnet.synsets(word)
+                            w2s = wordnet.synsets(kword)
+                            found = False
+                            for w1 in w1s:
+                                if not found:
+                                    for w2 in w2s:
+                                        if w1.wup_similarity(w2) > 0.9:
+                                            count += 1
+                                            seen.add(word)
+                                            found = True
+                                            break
+                                else:
+                                    break
+                        except:
+                            if kword == word:
+                                seen.add(word)
+                                count += 1
+            bigram_count = self.count_bigram(sentence, question)
+            trigram_count = self.count_trigram(sentence, question)
+            unique_count = len(seen)
+            final_count = count*.3 + bigram_count*.2 + unique_count*.4 + trigram_count*.2
+            if final_count >= (len(keywords)*.6+len(question.split(" "))*2*.4)*0.2:
+                result.append(sentence.original)
+                ratio = count/(len(sentence.original.split(" ")))
+                if ratio > bestRatio:
+                    bestRatio = ratio
+                    best = sentence.original
+            # To account for shorter sentences
+            elif len(question.split(" ")) < 5:
+                if unique_count >=2:
+                    result.append(sentence.original)
+                    ratio = count/(len(sentence.original.split(" ")))
+                    if ratio > bestRatio:
+                        bestRatio = ratio
+                        best = sentence.original
+                elif unique_count >=1:
+                    result3.append(sentence.original)
+        # Comment out these two lines to revert to previous "best" measure
+        result = list(set(result))
+        try:
+            best = tf_idf2.compareToOriginal(question, result)
+        except:
+            try:
+                result3 = list(set(result3))
+                best = tf_idf2.compareToOriginal(question, result3)
+            except:
+                best = backup
+        return result, best, len(result)
+
+    def count_bigram(self, sentence, question):
+        # counts the number of bigram occurences from the question in the sentence
+        count = 0
+        question = "START " + question
+        q_words = question.split(" ")
+        s_words = sentence.lemmatized.split(" ")
+        for i in range(1, len(q_words)):
+            # Possibily add in similarity checking here too
+            for j in range(len(s_words)):
+                if j == 0:
+                    count += question.count("START " + s_words[0])
+                else:
+                    count += question.count(s_words[j-1] + " " + s_words[j])
+        return count
+
+    def count_trigram(self, sentence, question):
+        # counts the number of trigram occurences from the question in a sentence
+        count = 0
+        question = "START START " + question
+        q_words = question.split(" ")
+        s_words = sentence.lemmatized.split(" ")
+        for i in range(2, len(q_words)):
+            for j in range(len(s_words)):
+                # Possibily add in similarity checking here too
+                if j == 0:
+                    prev1 = "START"
+                    prev2 = "START"
+                elif j == 1:
+                    prev1 == "START"
+                    prev2 = s_words[j-1]
+                else:
+                    prev1 = s_words[j-2]
+                    prev2 = s_words[j-1]
+                count += question.count(prev1 + " " + prev2 + " " + s_words[j])
+        return count
+
+    def get_possible_answers(self, text, question):
+        # Get all the sentences that possibly contain the answer
+        keywords = self.question_parser(self.lemmatize(question))
+        return self.extract_sentences_keyword(text, question)
+
+    def getWhereAnswer(self, question, bestAnswer):
+        # Gets answer of the where questions
+        words = question.split(" ")
+        nlp = en_core_web_sm.load()
+        doc = nlp(bestAnswer)
+        places = []
+        for ent in doc.ents:
+            if ent.label_ in {"PERSON", "GPE", "LOC", "FAC"}:
+                places.append(ent.text)
+        if places == []:
+            nouns = phrase_label_spacy.getNounPhrases(bestAnswer)
+            return nouns[0]
+        possible =[]
+        for place in places:
+            if place not in question:
+                possible.append(place)
+        if possible != []:
+            return possible[0]
+        else:
+            return places[0]
+    
+    def bestNounPhrase(self, possible, question):
+        # Gets the noun phrases with the most keywords in their corresponding
+        # verb phrase
+        bestNoun = None
+        bestVerb = None
+        bestScore = 0
+        for noun, verb in possible:
+            count = 0
+            question_lem = self.lemmatize(question)
+            verb_lem = self.lemmatize(verb)
+            keywords = self.question_parser(question_lem)
+            for word in verb_lem.split(" "):
+                if word in keywords:
+                    count += 1
+            ratio = count/len(verb_lem.split(" "))
+            if ratio > bestScore:
+                bestScore = ratio
+                bestNoun, bestVerb = noun, verb
+        if bestNoun == None:
+            return possible[0][0]
+        return bestNoun
+
+    def getWhoAnswer(self, question, bestAnswer):
+        #gets the answer for a who questions
+        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
+        nlp = en_core_web_md.load()
+        if len(phrases) == 1:
+            return phrases[0][0]
+        possible = []
+        for phrase in phrases:
+            flag = True
+            noun, verb = phrase
+            for w in noun.split(" "):
+                if w in question and not nlp.vocab[w].is_stop:
+                    flag = False
+            if flag:
+                possible.append(phrase)
+        if len(possible) == 1:
+            return possible[0][0]
+        elif len(possible) == 0:
+            possible = phrases
+        doc = nlp(bestAnswer)
+        ents = []
+        people = []
+        for ent in doc.ents:
+            for phrase in possible:
+                if ent.text in phrase[0]:
+                    if ent.label_ == "PERSON":
+                        people.append(phrase)
+                    if ent.label_ not in {"DATE", "TIME"}:
+                        ents.append(phrase)
+        if len(people) != 0:
+            return self.bestNounPhrase(people, question)
+        if len(ents) == 0:
+            return self.bestNounPhrase(possible, question)
+        else:
+            return self.bestNounPhrase(ents, question)
+
+    def getOtherAnswer(self, question, bestAnswer):
+        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
+        nlp = en_core_web_sm.load()
+        if len(phrases) == 1:
+            return phrases[0][0]
+        possible = []
+        for phrase in phrases:
+            flag = True
+            noun, verb = phrase
+            for w in noun.split(" "):
+                if w in question and not nlp.vocab[w].is_stop:
+                    flag = False
+            if flag:
+                possible.append(phrase)
+        if len(possible) == 1:
+            return possible[0][0]
+        elif len(possible) == 0:
+            possible = phrases
+        np = self.bestNounPhrase(possible, question)
+        return np
+
+    def getWhatAnswer(self, question, bestAnswer):
+        #gets the answer for a who questions
+        phrases = phrase_label_spacy.getNounVerbPhrasePairs(bestAnswer)
+        words = question.split(" ")
+        nlp = en_core_web_sm.load()
+        if "what" == words[0].lower() or "which" == words[0].lower():
+            beginning, categ = phrase_label_spacy.splitWhatQuestion(question)
+        else:
+            try:
+                i = words.index("what")
+            except:
+                i = words.index("which")
+            doc = nlp(question)
+            if i != len(doc) - 1:
+                if doc[i+1].pos_ not in {"VERB", "AUX"}:
+                    categ = doc[i+1].text
+                else: categ = ""
+            else: categ = ""
+        if categ != "":
+            for word in categ.split(" "):
+                if word in {"year", "month", "day", "century", "time", "millenium", "decade", "hour", "minute", "second", "day",
+                                "years", "months", "days", "centuries", "milleniums", "period", "periods", "hours", "minutes", "days", "seconds"}:
+                    return self.getWhenAnswer(question, bestAnswer)
+        if len(phrases) == 1:
+            return phrases[0][0]
+        possible = []
+        for phrase in phrases:
+            flag = True
+            noun, verb = phrase
+            for w in noun.split(" "):
+                if w in question and not nlp.vocab[w].is_stop and categ.strip() not in w.strip():
+                    flag = False
+            if flag:
+                possible.append(phrase)
+        if len(possible) == 1:
+            return possible[0][0]
+        elif len(possible) == 0:
+            possible = phrases
+        moreSure = []
+        if categ != "":
+            for noun, verb in possible:
+                if categ.strip() in noun:
+                    moreSure.append((noun, verb))
+        if len(moreSure) == 0:
+            return self.bestNounPhrase(possible, question)
+        else:
+            return self.bestNounPhrase(moreSure, question)
+
+    def yesNoAnswer(self, question, bestAnswer):
+        #removing question statements
+        question = question.lower()
+        if(question[-1] in string.punctuation):
+            question = question[:-1]
+        if(bestAnswer[-1] in string.punctuation):
+            bestAnswer = bestAnswer[:-1]
+        bestAnswer = bestAnswer.lower()
+        
+        if("is it true that " in question):
+            question = question.replace("is it true that ", "")
+        if("is it false that " in question):
+            question = question.replace("is it false that ", "")
+        if("is it correct that " in question):
+            question = question.replace("is it correct that ", "")
+        if("is it accurate that " in question):
+            question = question.replace("is it accurate that ", "")
+
+
+
+        # Really basic negation checking right now
+        q = "not" in question
+        a = "not" in bestAnswer
+        if (q and a) or (not q and not a):
+            
+            qwords = question.split(" ")
+            question = question[1:]
+            awords = bestAnswer.split(" ")
+            for item in awords:
+                for i, item2 in enumerate(qwords):
+                    word = self.comparison(item, item2)
+                    if(word == item):
+                        qwords[i] = item
+            for item in qwords:
+                if(item not in awords):
+                    return "No."
+            return "Yes."
+                        
+
+        else:
+            return "No."
+    #checking whether a word in the question isn't in the answer
+
+    def getWhyAnswer(self, question, bestAnswer):
+        # gets the answer for a why question
+        words = bestAnswer.split(" ")
+        if "because" in bestAnswer:
+            i = words.index("because")
+            reason =  " ".join(words[i+1:])
+            split = "because"
+        elif "since" in bestAnswer:
+            i = words.index("since")
+            reason =  " ".join(words[i+1:])
+            split = "since"
+        elif "due to" in bestAnswer:
+            i = words.index("due")
+            reason = " ".join(words[i+2:])
+            split = "due to"
+        elif "as" in bestAnswer:
+            i = words.index("as")
+            reason = " ".join(words[i+1:])
+            split = "as"
+        else:
+            return bestAnswer
+        return split + " " + reason
+          
+  
+        # gets the preposition for a where question
+        days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+        months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "November", "Decemeber"}
+        if any(char.isdigit() for char in date):
+            for word in date.split(" "):
+                if word in days:
+                    return "on"
+                elif word in months:
+                    return "on"
+            return "in"
+        else:
+            for word in date.split(" "):
+                if word in days:
+                    return "on"
+                elif word in months:
+                    return "in"
+            return "in"
+            
+    def getWhenAnswer(self, question, bestAnswer):
+        #gets the answer for a when question
+        words = question.split(" ")
+        nlp = en_core_web_md.load()
+        doc = nlp(bestAnswer)
+        ans_words = bestAnswer.split(" ")
+        nouns = phrase_label_spacy.getNounPhrases(bestAnswer)
+        possible = []
+        for word in doc:
+            if word.pos_ == "ADP":
+                ind = word.i
+                rest = ans_words[ans_words.index(word.text)+1:]
+                for noun in nouns:
+                    found = " ".join(rest).find(noun)
+                    if found != -1 and found < 8:
+                        possible.append(noun)
+        if len(possible) == 0:
+            return nouns[0]
+        moreSure = []
+        for phrase in possible:
+            if phrase not in question:
+                moreSure.append(phrase)
+        if len(moreSure) == 0:
+            return possible[0]
+        dates = []
+        for phrase in moreSure:
+            doc = nlp(phrase)
+            for ent in doc.ents:
+                if ent.label_ in {"DATE", "TIME"}:
+                    dates.append(phrase)
+        if len(dates) == 0:
+            return possible[0]
+        else:
+            return dates[0]
+
+
+    def getAnswer(self, question, bestAnswer):
+        # determines type of question
+        words = question.split(" ")
+        if words[0].lower() == "where":
+            return self.getWhereAnswer(question, bestAnswer)
+        elif words[0].lower() == "why" or "why" in words:
+            return self.getWhyAnswer(question, bestAnswer)
+        elif words[0].lower() == "how" or "how" in words:
+            return self.getOtherAnswer(question, bestAnswer)
+        elif words[0].lower() == "who" or words[0].lower() == "whom":
+            return self.getWhoAnswer(question, bestAnswer)            
+        elif words[0].lower() == "what" or "what" in words:
+            return self.getWhatAnswer(question, bestAnswer)
+        elif words[0].lower() == "does":
+            return self.yesNoAnswer(question, bestAnswer)
+        elif words[0].lower() == "is":
+            return self.yesNoAnswer(question, bestAnswer)
+        elif words[0].lower() == "which" or "which" in words:
+            return self.getWhatAnswer(question, bestAnswer)
+        elif words[0].lower() == "when" or "when" in words:
+            return self.getWhenAnswer(question, bestAnswer)
+        else:
+            return self.getOtherAnswer(question, bestAnswer)
+
+    def getBestAnswer(self, text, question):
+        # Gets the best answer for a question
+        possible, best, length =  self.extract_sentences_keyword(text, question)
+        answer =  self.getAnswer(question, best).strip().capitalize()
+        if answer[-1] == "?":
+            return answer[:-1] + "."
+        return answer
+
+
+def readFile(path):
+    with open(path, "rt", encoding = 'latin-1') as f:
+        return  f.read()
+
+def getQuestions(path):
+    contents = readFile(path)
+    results = []
+    for question in contents.splitlines():
+        results.append(question)
+    return results
+
+def getAnswers(text, questions):
+    text = cqg.readFile(text)
+    questions = getQuestions(questions)
+    parse = Parser()
+    result = ""
+    for question in questions:
+        question = question.replace("?", "")
+        ans =  parse.getBestAnswer(text, question).capitalize()
+        result += ans
+        result += '\n'
+    sys.stdout.write(result)
+                
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('text', help='Path to corpus text')
+    parser.add_argument('questions', help='Path to questions file')
+    args = parser.parse_args()
+    text = args.text
+    questions = args.questions
+    getAnswers(text, questions)
